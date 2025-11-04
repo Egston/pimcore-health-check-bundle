@@ -1,0 +1,19 @@
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+        public: false
+
+    Egston\PimcoreHealthCheckBundle\:
+        resource: '../src/'
+        exclude: '../src/DependencyInjection/'
+
+    Egston\PimcoreHealthCheckBundle\Controller\HealthCheckController:
+        arguments:
+            $path: '%egston_pimcore_health_check.path%'
+        tags: ['controller.service_arguments']
+
+    Egston\PimcoreHealthCheckBundle\Service\HealthCheckRunner:
+        arguments:
+            $checks: !tagged_iterator egston.pimcore_health_check.check
+            $enabled: '%egston_pimcore_health_check.enabled%'

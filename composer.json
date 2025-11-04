@@ -1,0 +1,20 @@
+{
+    "name": "egston/pimcore-health-check-bundle",
+    "description": "Pimcore health check bundle exposing a simple system status endpoint",
+    "type": "pimcore-bundle",
+    "license": "GPL-3.0-or-later",
+    "require": {
+        "php": "^8.2",
+        "pimcore/pimcore": "^11.5"
+    },
+    "autoload": {
+        "psr-4": {
+            "Egston\\PimcoreHealthCheckBundle\\": "src/"
+        }
+    },
+    "extra": {
+        "pimcore": {
+            "bundle-class": "Egston\\PimcoreHealthCheckBundle\\EgstonPimcoreHealthCheckBundle"
+        }
+    }
+}
