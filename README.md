@@ -4,9 +4,15 @@ Pimcore 11 bundle that exposes a production friendly `GET /healthz` endpoint sum
 
 ## Features
 
-- Ships with a writable temporary directory check to verify disk access.
+- Bundles writable temporary storage, database connectivity, and cache read/write checks.
 - Extensible through Symfony services implementing `HealthCheckInterface`.
 - Configurable endpoint path via bundle configuration.
+
+## Built-in Checks
+
+- `temporary_storage`: Verifies the system can create and delete files in the temporary directory.
+- `database`: Executes a simple `SELECT 1` on the default Doctrine connection.
+- `cache`: Performs a write/read/delete cycle against the primary Symfony cache pool.
 
 ## Installation
 
@@ -69,19 +75,24 @@ bin/console debug:router | grep health
 namespace App\HealthCheck;
 
 use Egston\PimcoreHealthCheckBundle\Health\HealthCheckInterface;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
-final class DatabaseConnectionCheck implements HealthCheckInterface
+final class ExternalApiCheck implements HealthCheckInterface
 {
-    public function __construct(private readonly \Pimcore\Db $db) {}
+    public function __construct(private readonly HttpClientInterface $httpClient) {}
 
     public function getName(): string
     {
-        return 'database';
+        return 'external_api';
     }
 
     public function assert(): void
     {
-        $this->db->fetchOne('SELECT 1');
+        $response = $this->httpClient->request('GET', 'https://status.example.com/ping', ['timeout' => 2]);
+
+        if (200 !== $response->getStatusCode()) {
+            throw new \RuntimeException('Upstream status endpoint returned a non-200 response.');
+        }
     }
 }
 ```
@@ -100,6 +111,14 @@ Successful response (`200 OK`):
   "checks": [
     {
       "name": "temporary_storage",
+      "status": "ok"
+    },
+    {
+      "name": "database",
+      "status": "ok"
+    },
+    {
+      "name": "cache",
       "status": "ok"
     }
   ]
