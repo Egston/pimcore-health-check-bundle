@@ -65,23 +65,23 @@ Enable GraphQL probes by providing one or more endpoints:
 
 ```yaml
 egston_pimcore_health_check:
+    enabled: true
+    path: '/healthz'
     graphql:
         enabled: true
         endpoints:
-            - name: 'datahub_default'
-              url: '/pimcore-graphql-webservices/datahub_default'
+            - name: 'public-content'
+              # Check through nginx service inside the cluster since pimcore-php is running php-fpm without web server
+              url: 'http://pimcore-nginx.pimcore.svc.cluster.local/pimcore-graphql-webservices/public-content'
               query: |
-                  query Health {
-                      health {
-                          status
-                          version
-                      }
+                  query Ping {
+                    __typename
                   }
-              timeout: 1.5
+              timeout: 3
               api_key: '%env(DATAHUB_API_KEY)%'
               assert:
-                  path: 'data.health.status'
-                  equals: 'OK'
+                  path: 'data.__typename'
+                  equals: 'Query'
             - name: 'external_partner'
               url: 'https://partner.example/graphql'
               authorization_bearer: '%env(PARTNER_TOKEN)%'
