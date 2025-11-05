@@ -6,7 +6,9 @@ services:
 
     Egston\PimcoreHealthCheckBundle\:
         resource: '../src/'
-        exclude: '../src/DependencyInjection/'
+        exclude:
+            - '../src/DependencyInjection/'
+            - '../src/Health/GraphQlEndpointCheck.php'
 
     Egston\PimcoreHealthCheckBundle\Controller\HealthCheckController:
         arguments:
