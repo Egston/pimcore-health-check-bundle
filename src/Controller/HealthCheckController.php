@@ -23,7 +23,7 @@ class HealthCheckController
             default => 503,
         };
 
-        return new JsonResponse(
+        $response = new JsonResponse(
             [
                 'status' => $result['status'],
                 'path' => $this->path,
@@ -32,5 +32,14 @@ class HealthCheckController
             ],
             $statusCode
         );
+
+        $response->headers->addCacheControlDirective('no-store');
+        $response->headers->addCacheControlDirective('max-age', 0);
+        $response->headers->addCacheControlDirective('private');
+        $response->headers->set('Pragma', 'no-cache');
+        $response->headers->set('Expires', '0');
+        $response->headers->set('X-Pimcore-Output-Cache-Disable-Reason', 'health_check');
+
+        return $response;
     }
 }
