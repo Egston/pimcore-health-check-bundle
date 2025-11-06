@@ -133,10 +133,20 @@ Configure DataHub checks by pointing the `url` to `/pimcore-graphql-webservices/
 You can use following standard Pimcore commands to check for common extension issues:
 
 ```bash
+# Verify that the bundle is installed and enabled
 bin/console pimcore:bundle:list
+
+# Inspect the current configuration loaded for the bundle
 bin/console debug:config egston_pimcore_health_check
+
+# Check if the healthz route is correctly registered
 bin/console debug:router | grep health
+
+# List all active health check services discovered by autoconfiguration
+bin/console debug:container --tag=egston.pimcore_health_check.check
 ```
+
+All errors around GraphQL checks are logged to Pimcore/Symfony log file for further inspection.
 
 ## Adding Custom Checks
 
