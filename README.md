@@ -82,6 +82,28 @@ egston_pimcore_health_check:
               assert:
                   path: 'data.__typename'
                   equals: 'Query'
+            - name: 'healthcheck'
+              url: 'http://pimcore-nginx.pimcore.svc.cluster.local/pimcore-graphql-webservices/public-content'
+              query: |
+                  query HealthCheck {
+                    getHealthCheckListing {
+                      totalCount
+                      edges {
+                        node {
+                          __typename
+                          key
+                          description
+                          checkValue
+                        }
+                      }
+                    }
+                  }
+              timeout: 3
+              api_key: '%env(DATAHUB_API_KEY)%'
+              assert:
+                  path: 'data.getHealthCheckListing.edges[0].node.checkValue'
+                  equals: 'I am ready!'
+
             - name: 'external_partner'
               url: 'https://partner.example/graphql'
               authorization_bearer: '%env(PARTNER_TOKEN)%'
