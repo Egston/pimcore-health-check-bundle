@@ -4,11 +4,13 @@ namespace Egston\PimcoreHealthCheckBundle\Health;
 
 use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Exception\GuzzleException;
+use Psr\Log\LoggerInterface;
 
 class GraphQlEndpointCheck implements HealthCheckInterface
 {
     public function __construct(
         private readonly ClientInterface $httpClient,
+        private readonly LoggerInterface $logger,
         private readonly string $name,
         private readonly string $url,
         private readonly string $query,
@@ -51,18 +53,40 @@ class GraphQlEndpointCheck implements HealthCheckInterface
             /** @var array<string, mixed> $payload */
             $payload = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
         } catch (GuzzleException $exception) {
+            $this->logger->error(
+                'GraphQL health check HTTP request failed.',
+                $this->context([
+                    'exception_message' => $exception->getMessage(),
+                    'exception_code' => $exception->getCode(),
+                ])
+            );
+
             throw new \RuntimeException(
                 sprintf('GraphQL request failed: %s', $exception->getMessage()),
                 (int) $exception->getCode(),
                 $exception
             );
         } catch (\JsonException $exception) {
+            $this->logger->error(
+                'GraphQL health check response contained invalid JSON.',
+                $this->context([
+                    'exception_message' => $exception->getMessage(),
+                ])
+            );
+
             throw new \RuntimeException(
                 sprintf('GraphQL response payload is not valid JSON: %s', $exception->getMessage()),
                 (int) $exception->getCode(),
                 $exception
             );
         } catch (\Throwable $exception) {
+            $this->logger->error(
+                'GraphQL health check unexpected failure.',
+                $this->context([
+                    'exception_message' => $exception->getMessage(),
+                ])
+            );
+
             throw new \RuntimeException(
                 sprintf('GraphQL request failed: %s', $exception->getMessage()),
                 (int) $exception->getCode(),
@@ -71,6 +95,13 @@ class GraphQlEndpointCheck implements HealthCheckInterface
         }
 
         if (isset($payload['errors']) && !empty($payload['errors'])) {
+            $this->logger->error(
+                'GraphQL health check response contains errors.',
+                $this->context([
+                    'errors' => $payload['errors'],
+                ])
+            );
+
             throw new \RuntimeException('GraphQL response contains errors.');
         }
 
@@ -126,12 +157,30 @@ class GraphQlEndpointCheck implements HealthCheckInterface
 
             if (is_array($current)) {
                 if (!array_key_exists($key, $current)) {
+                    $this->logger->error(
+                        'GraphQL health check path not found in response payload.',
+                        $this->context([
+                            'path' => $path,
+                            'missing_segment' => $segment,
+                            'current_keys' => array_keys($current),
+                        ])
+                    );
+
                     throw new \RuntimeException(sprintf('Response path "%s" not found in GraphQL payload.', $path));
                 }
 
                 $current = $current[$key];
                 continue;
             }
+
+            $this->logger->error(
+                'GraphQL health check encountered non-traversable value while resolving path.',
+                $this->context([
+                    'path' => $path,
+                    'segment' => $segment,
+                    'current_type' => get_debug_type($current),
+                ])
+            );
 
             throw new \RuntimeException(sprintf('Unable to traverse path "%s"; current value is not traversable.', $path));
         }
@@ -215,5 +264,18 @@ class GraphQlEndpointCheck implements HealthCheckInterface
         $separator = str_contains($url, '?') ? '&' : '?';
 
         return $url . $separator . rawurlencode($key) . '=' . rawurlencode($value);
+    }
+
+    /**
+     * @param array<string, mixed> $extra
+     * @return array<string, mixed>
+     */
+    private function context(array $extra = []): array
+    {
+        return array_merge([
+            'check' => $this->getName(),
+            'endpoint' => $this->url,
+            'api_key_provided' => $this->apiKey !== null,
+        ], $extra);
     }
 }

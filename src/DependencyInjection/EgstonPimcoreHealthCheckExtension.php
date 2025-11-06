@@ -5,6 +5,7 @@ namespace Egston\PimcoreHealthCheckBundle\DependencyInjection;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
+use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\DependencyInjection\Extension\PrependExtensionInterface;
 use Symfony\Component\DependencyInjection\Loader\YamlFileLoader;
 use Symfony\Component\HttpKernel\DependencyInjection\ConfigurableExtension;
@@ -52,6 +53,7 @@ class EgstonPimcoreHealthCheckExtension extends ConfigurableExtension implements
             $definition = (new Definition(GraphQlEndpointCheck::class))
                 ->setAutowired(true)
                 ->setAutoconfigured(false)
+                ->setArgument('$logger', new Reference('logger'))
                 ->setArgument('$name', $endpointConfig['name'])
                 ->setArgument('$url', $resolved['url'])
                 ->setArgument('$query', $endpointConfig['query'])
