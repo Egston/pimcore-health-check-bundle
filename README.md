@@ -166,12 +166,14 @@ egston_pimcore_health_check:
 Each entry surfaces in the response as `graphql_internal_<name>`. Configuration fields:
 
 - `name`: Logical name (used in reporting as `graphql_internal_<name>`).
-- `path`: In-process URI path to dispatch the synthetic request against.
+- `path`: In-process URI path to dispatch the synthetic request against. **Must target a route intended for unauthenticated access** — see the security caveat below.
 - `query`: GraphQL query payload (defaults to `{ __typename }`).
 - `api_key`: Optional API key appended as `?apikey=<value>` when provided. Same convention as the HTTP `graphql:` block, useful for Pimcore DataHub endpoints that expect query-string authentication.
 - `assert.path` / `assert.equals` / `assert.contains` / `assert.is_empty`: Same assertion DSL as the HTTP `graphql:` block.
 
 **Coverage trade-off**: `graphql_internal` does NOT exercise the upstream nginx / FastCGI bridge — only the Symfony kernel and below. nginx-config issues fail loudly at chart upgrade and are better caught by external synthetic monitoring (e.g. Google Cloud Monitoring uptime checks against the public ingress) than by a kubelet probe. Pair `graphql_internal` (per-pod readiness) with synthetic monitoring (cluster-level e2e) for full coverage.
+
+**Security caveat — `SUB_REQUEST` skips Symfony firewalls**: `HttpKernelInterface::SUB_REQUEST` deliberately bypasses Symfony's `FirewallListener` and `access_control` rules — that's how the kernel implements forward-style internal dispatch. As a result, a `graphql_internal` probe against `/admin/...` or `/api/...` would reach the controller with whatever security token the parent request had (none, in a kubelet probe). Configure `path:` ONLY for endpoints intended to be world-accessible (e.g. the DataHub `public-content` endpoint, which authenticates via the `apikey` query param rather than firewall). Never aim `graphql_internal` at routes that depend on firewall enforcement to gate sensitive data or mutations.
 
 **Recommended probe wiring**: with `graphql_internal` configured, the kubelet probe answering `/readyz` (`path:` above) belongs on the **PHP-FPM container**, dispatched via `cgi-fcgi` exec — that places restart authority on the pod that actually hosts the application logic. See the `yageo-pimcore-k8s` chart for an example DSF override.
 
