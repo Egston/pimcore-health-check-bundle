@@ -69,8 +69,12 @@ class GraphQlSubRequestCheck implements HealthCheckInterface
                 $this->context(['exception_message' => $exception->getMessage()])
             );
 
+            // Public message intentionally omits $exception->getMessage() — the
+            // runner echoes message text into the /readyz JSON response, which
+            // is reachable from the public Internet. Underlying detail stays in
+            // the application log via logger->error above.
             throw new \RuntimeException(
-                sprintf('Could not encode GraphQL query as JSON: %s', $exception->getMessage()),
+                'GraphQL sub-request could not encode query; see logs.',
                 (int) $exception->getCode(),
                 $exception
             );
@@ -80,8 +84,11 @@ class GraphQlSubRequestCheck implements HealthCheckInterface
                 $this->context(['exception_message' => $exception->getMessage()])
             );
 
+            // Doctrine / Pimcore exceptions can carry DB URIs, internal
+            // hostnames, and stack-frame paths in getMessage(). Redact for the
+            // public response; full detail in logs.
             throw new \RuntimeException(
-                sprintf('GraphQL sub-request failed: %s', $exception->getMessage()),
+                'GraphQL sub-request failed; see logs.',
                 (int) $exception->getCode(),
                 $exception
             );
@@ -111,7 +118,7 @@ class GraphQlSubRequestCheck implements HealthCheckInterface
             );
 
             throw new \RuntimeException(
-                sprintf('GraphQL response payload is not valid JSON: %s', $exception->getMessage()),
+                'GraphQL sub-request response is not valid JSON; see logs.',
                 (int) $exception->getCode(),
                 $exception
             );
@@ -123,7 +130,7 @@ class GraphQlSubRequestCheck implements HealthCheckInterface
                 $this->context(['errors' => $payload['errors']])
             );
 
-            throw new \RuntimeException('GraphQL response contains errors.');
+            throw new \RuntimeException('GraphQL sub-request response contains errors; see logs.');
         }
 
         $value = $this->resolvePath($payload, $this->assertions['path'] ?? null);
