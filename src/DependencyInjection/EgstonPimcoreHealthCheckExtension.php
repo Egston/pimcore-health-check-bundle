@@ -11,6 +11,8 @@ use Symfony\Component\DependencyInjection\Loader\YamlFileLoader;
 use Symfony\Component\HttpKernel\DependencyInjection\ConfigurableExtension;
 use Egston\PimcoreHealthCheckBundle\Health\HealthCheckInterface;
 use Egston\PimcoreHealthCheckBundle\Health\GraphQlEndpointCheck;
+use Egston\PimcoreHealthCheckBundle\Health\GraphQlSubRequestCheck;
+use Symfony\Component\HttpKernel\HttpKernelInterface;
 
 class EgstonPimcoreHealthCheckExtension extends ConfigurableExtension implements PrependExtensionInterface
 {
@@ -26,6 +28,7 @@ class EgstonPimcoreHealthCheckExtension extends ConfigurableExtension implements
             ->addTag('egston.pimcore_health_check.check');
 
         $this->registerGraphQlChecks($mergedConfig['graphql'] ?? [], $container);
+        $this->registerGraphQlInternalChecks($mergedConfig['graphql_internal'] ?? [], $container);
     }
 
     public function prepend(ContainerBuilder $container): void
@@ -94,6 +97,45 @@ class EgstonPimcoreHealthCheckExtension extends ConfigurableExtension implements
             'api_key' => $apiKey,
             'authorization_bearer' => $authorizationBearer,
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $graphqlInternalConfig
+     */
+    private function registerGraphQlInternalChecks(array $graphqlInternalConfig, ContainerBuilder $container): void
+    {
+        if (empty($graphqlInternalConfig['enabled']) || empty($graphqlInternalConfig['endpoints'])) {
+            return;
+        }
+
+        foreach ($graphqlInternalConfig['endpoints'] as $endpointConfig) {
+            if (empty($endpointConfig['name']) || empty($endpointConfig['path'])) {
+                throw new \InvalidArgumentException(sprintf(
+                    'GraphQL internal endpoint requires both "name" and "path" (got name="%s", path="%s").',
+                    $endpointConfig['name'] ?? '',
+                    $endpointConfig['path'] ?? ''
+                ));
+            }
+
+            $serviceId = sprintf(
+                'egston_pimcore_health_check.graphql_internal.%s',
+                $this->normalizeServiceIdSegment($endpointConfig['name'])
+            );
+
+            $definition = (new Definition(GraphQlSubRequestCheck::class))
+                ->setAutowired(false)
+                ->setAutoconfigured(false)
+                ->setArgument('$kernel', new Reference(HttpKernelInterface::class))
+                ->setArgument('$logger', new Reference('logger'))
+                ->setArgument('$name', $endpointConfig['name'])
+                ->setArgument('$path', $endpointConfig['path'])
+                ->setArgument('$query', $endpointConfig['query'])
+                ->setArgument('$assertions', $endpointConfig['assert'] ?? [])
+                ->setArgument('$apiKey', $endpointConfig['api_key'] ?? null)
+                ->addTag('egston.pimcore_health_check.check');
+
+            $container->setDefinition($serviceId, $definition);
+        }
     }
 
     private function normalizeServiceIdSegment(string $name): string

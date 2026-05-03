@@ -14,7 +14,8 @@ Pimcore 11 bundle that exposes a production friendly `GET /healthz` endpoint sum
 - `temporary_storage`: Verifies the system can create and delete files in the temporary directory.
 - `database`: Executes a simple `SELECT 1` on the default Doctrine connection.
 - `cache`: Performs a write/read/delete cycle against the primary Symfony cache pool.
-- `graphql_*`: Available when configured; issues a GraphQL request and validates the response.
+- `graphql_*`: Available when configured; issues an outbound HTTP GraphQL request and validates the response.
+- `graphql_internal_*`: Available when configured; dispatches a GraphQL request as a Symfony sub-request against the same kernel — covers routing + controller + resolvers without needing an HTTP listener or cluster Service routing. Recommended for per-pod readiness probes.
 
 ## Installation
 
@@ -127,6 +128,52 @@ egston_pimcore_health_check:
 - `assert.is_empty`: Expect the selected value to be empty (`true`) or non-empty (`false`).
 
 Configure DataHub checks by pointing the `url` to `/pimcore-graphql-webservices/<client>` and supplying the associated API key via `api_key`. Other GraphQL providers remain fully configurable by combining `url`, `authorization_bearer`, and `headers`.
+
+## In-Process (Sub-Request) GraphQL Checks
+
+`graphql_internal` checks dispatch a synthetic POST request through the Symfony kernel via `HttpKernelInterface::SUB_REQUEST` — no outbound HTTP, no cluster Service involvement, no second FPM worker. Use these for per-pod readiness probes that need to verify the application's GraphQL endpoint actually serves data, without the cold-start deadlock that an HTTP self-call introduces (a Service has zero Ready endpoints until the very probe being answered passes — see https://github.com/Egston/pimcore-health-check-bundle for the full discussion).
+
+```yaml
+egston_pimcore_health_check:
+    enabled: true
+    path: '/readyz'
+    graphql_internal:
+        enabled: true
+        endpoints:
+            - name: 'public_content_smoke'
+              # In-process URI path. Same path your nginx forwards to PHP.
+              path: '/pimcore-graphql-webservices/public-content'
+              api_key: '%env(DATAHUB_API_KEY)%'
+              query: |
+                  query HealthCheck {
+                    getHealthCheckListing {
+                      edges {
+                        node {
+                          __typename
+                        }
+                      }
+                    }
+                  }
+              # Asserts the DataObject layer resolves end-to-end through
+              # Pimcore-DH (≥ 1 HealthCheck DataObject must exist for the
+              # assertion to pass — that is an operational responsibility
+              # of the host installation, not the bundle).
+              assert:
+                  path: 'data.getHealthCheckListing.edges'
+                  is_empty: false
+```
+
+Each entry surfaces in the response as `graphql_internal_<name>`. Configuration fields:
+
+- `name`: Logical name (used in reporting as `graphql_internal_<name>`).
+- `path`: In-process URI path to dispatch the synthetic request against.
+- `query`: GraphQL query payload (defaults to `{ __typename }`).
+- `api_key`: Optional API key appended as `?apikey=<value>` when provided. Same convention as the HTTP `graphql:` block, useful for Pimcore DataHub endpoints that expect query-string authentication.
+- `assert.path` / `assert.equals` / `assert.contains` / `assert.is_empty`: Same assertion DSL as the HTTP `graphql:` block.
+
+**Coverage trade-off**: `graphql_internal` does NOT exercise the upstream nginx / FastCGI bridge — only the Symfony kernel and below. nginx-config issues fail loudly at chart upgrade and are better caught by external synthetic monitoring (e.g. Google Cloud Monitoring uptime checks against the public ingress) than by a kubelet probe. Pair `graphql_internal` (per-pod readiness) with synthetic monitoring (cluster-level e2e) for full coverage.
+
+**Recommended probe wiring**: with `graphql_internal` configured, the kubelet probe answering `/readyz` (`path:` above) belongs on the **PHP-FPM container**, dispatched via `cgi-fcgi` exec — that places restart authority on the pod that actually hosts the application logic. See the `yageo-pimcore-k8s` chart for an example DSF override.
 
 ## Troubleshooting
 
