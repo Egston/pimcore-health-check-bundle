@@ -8,6 +8,8 @@ use Psr\Log\LoggerInterface;
 
 class GraphQlEndpointCheck implements HealthCheckInterface
 {
+    use AssertsResponsePayload;
+
     public function __construct(
         private readonly ClientInterface $httpClient,
         private readonly LoggerInterface $logger,
@@ -138,125 +140,6 @@ class GraphQlEndpointCheck implements HealthCheckInterface
         }
 
         return $headers;
-    }
-
-    /**
-     * @param array<mixed> $payload
-     */
-    private function resolvePath(array $payload, ?string $path): mixed
-    {
-        if ($path === null || trim($path) === '') {
-            return $payload;
-        }
-
-        $segments = explode('.', $path);
-        $current = $payload;
-
-        foreach ($segments as $segment) {
-            $key = $this->normalizeSegment($segment);
-
-            if (is_array($current)) {
-                if (!array_key_exists($key, $current)) {
-                    $this->logger->error(
-                        'GraphQL health check path not found in response payload.',
-                        $this->context([
-                            'path' => $path,
-                            'missing_segment' => $segment,
-                            'current_keys' => array_keys($current),
-                        ])
-                    );
-
-                    throw new \RuntimeException(sprintf('Response path "%s" not found in GraphQL payload.', $path));
-                }
-
-                $current = $current[$key];
-                continue;
-            }
-
-            $this->logger->error(
-                'GraphQL health check encountered non-traversable value while resolving path.',
-                $this->context([
-                    'path' => $path,
-                    'segment' => $segment,
-                    'current_type' => get_debug_type($current),
-                ])
-            );
-
-            throw new \RuntimeException(sprintf('Unable to traverse path "%s"; current value is not traversable.', $path));
-        }
-
-        return $current;
-    }
-
-    private function normalizeSegment(string $segment): string|int
-    {
-        $trimmed = trim($segment);
-
-        if (ctype_digit($trimmed)) {
-            return (int) $trimmed;
-        }
-
-        return $trimmed;
-    }
-
-    private function assertEquals(mixed $value, mixed $expected): void
-    {
-        if ($expected === null) {
-            return;
-        }
-
-        if ($value !== $expected) {
-            throw new \RuntimeException(sprintf('Expected value "%s" but got "%s".', $this->stringify($expected), $this->stringify($value)));
-        }
-    }
-
-    private function assertContains(mixed $value, mixed $expectedElement): void
-    {
-        if ($expectedElement === null) {
-            return;
-        }
-
-        if (!is_iterable($value)) {
-            throw new \RuntimeException('Value is not iterable; cannot check for containment.');
-        }
-
-        $items = is_array($value) ? $value : iterator_to_array($value);
-
-        if (!in_array($expectedElement, $items, true)) {
-            throw new \RuntimeException(sprintf('Expected element "%s" not found in iterable.', $this->stringify($expectedElement)));
-        }
-    }
-
-    private function assertEmptyState(mixed $value, ?bool $expectedEmpty): void
-    {
-        if ($expectedEmpty === null) {
-            return;
-        }
-
-        $isEmpty = empty($value);
-
-        if ($expectedEmpty && !$isEmpty) {
-            throw new \RuntimeException('Expected value to be empty.');
-        }
-
-        if (!$expectedEmpty && $isEmpty) {
-            throw new \RuntimeException('Expected value to be non-empty.');
-        }
-    }
-
-    private function stringify(mixed $value): string
-    {
-        if (is_scalar($value) || $value === null) {
-            return var_export($value, true);
-        }
-
-        $encoded = json_encode($value);
-
-        if ($encoded === false) {
-            return '[unserializable value]';
-        }
-
-        return $encoded;
     }
 
     private function appendQueryParameter(string $url, string $key, string $value): string
