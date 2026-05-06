@@ -133,11 +133,23 @@ class GraphQlSubRequestCheck implements HealthCheckInterface
             throw new \RuntimeException('GraphQL sub-request response contains errors; see logs.');
         }
 
-        $value = $this->resolvePath($payload, $this->assertions['path'] ?? null);
+        try {
+            $value = $this->resolvePath($payload, $this->assertions['path'] ?? null);
 
-        $this->assertEquals($value, $this->assertions['equals'] ?? null);
-        $this->assertContains($value, $this->assertions['contains'] ?? null);
-        $this->assertEmptyState($value, $this->assertions['is_empty'] ?? null);
+            $this->assertEquals($value, $this->assertions['equals'] ?? null);
+            $this->assertContains($value, $this->assertions['contains'] ?? null);
+            $this->assertEmptyState($value, $this->assertions['is_empty'] ?? null);
+        } catch (\RuntimeException $exception) {
+            $this->logger->error(
+                'GraphQL sub-request health check assertion failed.',
+                $this->context([
+                    'assertion_path' => $this->assertions['path'] ?? null,
+                    'exception_message' => $exception->getMessage(),
+                ])
+            );
+
+            throw $exception;
+        }
     }
 
     private function buildUri(): string
