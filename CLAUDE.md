@@ -12,9 +12,15 @@ The bundle exposes the endpoint via Symfony routing; the host project decides ho
 
 ## Development
 
-There are no tests, Makefile, or CI/CD pipelines in this repository. Development consists of editing PHP source files and validating by installing the bundle in a host Pimcore project.
+A PHPUnit suite covers the security-relevant logic (path-safety denylist, service-ID collision detection, log redaction) and the response-payload assertion trait. Tests run on the host without booting Pimcore — the bundle's own `composer install` provisions a local `vendor/`:
 
-To validate bundle registration in a host project:
+```bash
+composer install --ignore-platform-reqs    # one-time
+vendor/bin/phpunit                         # runs the Unit suite
+```
+
+There are no Makefile or CI/CD pipelines in this repository. Beyond the unit suite, validate bundle registration in a host Pimcore project:
+
 ```bash
 php bin/console debug:container egston
 php bin/console debug:router | grep healthz

@@ -7,9 +7,17 @@
         "php": "^8.2",
         "pimcore/pimcore": "^11.5"
     },
+    "require-dev": {
+        "phpunit/phpunit": "^10.5"
+    },
     "autoload": {
         "psr-4": {
             "Egston\\PimcoreHealthCheckBundle\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Egston\\PimcoreHealthCheckBundle\\Tests\\": "tests/"
         }
     },
     "extra": {
