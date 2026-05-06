@@ -131,7 +131,7 @@ Configure DataHub checks by pointing the `url` to `/pimcore-graphql-webservices/
 
 ## In-Process (Sub-Request) GraphQL Checks
 
-`graphql_internal` checks dispatch a synthetic POST request through the Symfony kernel via `HttpKernelInterface::SUB_REQUEST` — no outbound HTTP, no cluster Service involvement, no second FPM worker. Use these for per-pod readiness probes that need to verify the application's GraphQL endpoint actually serves data, without the cold-start deadlock that an HTTP self-call introduces (a Service has zero Ready endpoints until the very probe being answered passes — see https://github.com/Egston/pimcore-health-check-bundle for the full discussion).
+`graphql_internal` checks dispatch a synthetic POST request through the Symfony kernel via `HttpKernelInterface::SUB_REQUEST` — no outbound HTTP, no cluster Service involvement, no Service-endpoint deadlock at cold start. Use these for per-pod readiness probes that need to verify the application's GraphQL endpoint actually serves data, without the cold-start deadlock that an HTTP self-call introduces (a Service has zero Ready endpoints until the very probe being answered passes — see https://github.com/Egston/pimcore-health-check-bundle for the full discussion).
 
 ```yaml
 egston_pimcore_health_check:
