@@ -168,6 +168,8 @@ class EgstonPimcoreHealthCheckExtension extends ConfigurableExtension implements
      *   - trim — leading/trailing whitespace in the YAML scalar would otherwise
      *     defeat str_starts_with against bare prefixes
      *   - bounded urldecode loop — defeats double-encoded escapes like %2561dmin
+     *   - lowercase — defeats /Admin / /ADMIN casing variants since the prefix
+     *     comparison below is byte-exact
      *   - require leading '/' after decode — Symfony Request::create with a
      *     missing slash routes ambiguously
      *   - reject '..' as a path segment — '/safe/../admin' would resolve into

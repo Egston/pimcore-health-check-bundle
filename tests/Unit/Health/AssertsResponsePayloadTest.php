@@ -9,9 +9,13 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Trait helpers are private by design (the trait composes into checks that
- * shouldn't expose them as public API). Tests use the trait-rename trick
- * `use AssertsResponsePayload { method as public; }` to expose them in a
- * test-only fixture without changing production visibility.
+ * shouldn't expose them as public API). Tests drive the four helpers that
+ * form the trait's effective contract — `resolvePath`, `assertEquals`,
+ * `assertContains`, `assertEmptyState` — by aliasing them to public via
+ * `use AssertsResponsePayload { method as public; }` in an anonymous
+ * fixture; production visibility is unchanged. The remaining trait
+ * privates (`normalizeSegment`, `stringify`) are pure implementation
+ * details exercised transitively through their callers above.
  */
 final class AssertsResponsePayloadTest extends TestCase
 {
