@@ -48,7 +48,7 @@ Two complementary GraphQL probe modes are available; both are off by default and
 
 `GraphQlSubRequestCheck` (`graphql_internal.endpoints[*]`) dispatches the same query as a Symfony sub-request through `HttpKernelInterface::SUB_REQUEST` — covers routing + controller + resolvers without an outbound HTTP hop, so it survives cold start. Two constraints to know:
 
-- **SUB_REQUEST bypasses Symfony firewalls and `access_control`.** The extension rejects `path:` values whose URL-decoded, lowercased form begins with `/admin`, `/api/`, or `/asset/webdav` at container-compile time. Configure only routes intended for unauthenticated access (e.g. DataHub `public-content`).
+- **SUB_REQUEST bypasses Symfony firewalls and `access_control`.** As an operator-misconfiguration guard, the extension rejects `path:` values that resolve to the `/admin` prefix at container-compile time — the one prefix every Pimcore deployment shares. Other firewall-protected prefixes (e.g. JWT-protected REST APIs, WebDAV mounts, custom host firewalls) vary by installation and are out of scope; the host's `security.yaml` is the source of truth, and operator review of `path:` against it carries the rest. Configure only routes intended for unauthenticated access (e.g. DataHub `public-content`).
 - Does NOT exercise the upstream nginx / FastCGI bridge — pair with external synthetic monitoring for full-stack coverage.
 
 Both checks share assertion logic via the `AssertsResponsePayload` trait — dot-notation path traversal with `equals` / `contains` / `is_empty` predicates, throwing `\RuntimeException` on mismatch.
