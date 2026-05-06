@@ -120,7 +120,7 @@ class Configuration implements ConfigurationInterface
                                     ->floatNode('timeout')
                                         ->defaultValue(3.0)
                                         ->min(0.1)
-                                        ->info('Sub-request timeout in seconds. Enforced via pcntl_alarm when the pcntl extension is loaded; rounded up to whole seconds (pcntl_alarm is integer-only). Without pcntl, only the kubelet timeoutSeconds bounds the probe.')
+                                        ->info('Sub-request timeout in seconds (sub-second precision is rounded up to a whole second).')
                                     ->end()
                                     ->scalarNode('api_key')
                                         ->defaultNull()

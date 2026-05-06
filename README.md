@@ -118,7 +118,7 @@ egston_pimcore_health_check:
 - `name`: Displayed in the health report as `graphql_<name>`.
 - `url`: Absolute GraphQL endpoint URL.
 - `query`: GraphQL query payload (defaults to `{ __typename }`).
-- `timeout`: Request timeout in seconds (defaults to `1.0`).
+- `timeout`: Request timeout in seconds (defaults to `3.0`).
 - `headers`: Optional HTTP headers such as authentication tokens.
 - `authorization_bearer`: Convenience property to set an `Authorization: Bearer <token>` header when your endpoint expects it.
 - `api_key`: Optional API key appended as `?apikey=<value>` when provided. Useful for Pimcore DataHub endpoints that expect query-string authentication.
