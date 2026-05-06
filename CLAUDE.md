@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a Pimcore 11.5+ bundle (`egston/pimcore-health-check-bundle`) that exposes a `/healthz` endpoint returning JSON status of configured health checks. It is not a standalone application — it is installed into `pimcore-installation/` via Composer (path repository from `./dev/pimcore-health-check-bundle`).
 
-The endpoint is wired as the pod's readiness probe in the `yageo-pimcore-k8s` deployment (currently kubelet `exec` via `cgi-fcgi` on the PHP-FPM container, hitting `/readyz`). A 503 response causes traffic to stop routing to that pod — this is why cache operations on prod must always use the two-step `cache:clear --no-warmup` + `cache:warmup` sequence rather than `cache:clear` alone (which creates a gap where the probe could return 503).
+The bundle exposes the endpoint via Symfony routing; the host project decides how to wire it as a probe. Where this bundle is deployed today, the endpoint gates traffic to the pod (a 503 stops routing) — which is why cache operations on prod must always use the two-step `cache:clear --no-warmup` + `cache:warmup` sequence rather than `cache:clear` alone (which creates a gap where the probe could return 503). For the specific kubelet wiring, image, command, and probe-timing values in use, see `yageo-pimcore-k8s/dev/helmsman/dsf/gke.yaml` and the corresponding wiki page.
 
 ## Development
 
