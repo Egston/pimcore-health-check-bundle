@@ -24,11 +24,12 @@ class EgstonPimcoreHealthCheckExtension extends ConfigurableExtension implements
      * truth for what's actually firewall-protected.
      *
      * Only /admin is listed because it's the one prefix every Pimcore
-     * deployment shares. Other firewall-protected prefixes (e.g. /api/* under
-     * pimcore-jwt-auth-bundle, /asset/webdav, custom host firewalls) vary by
-     * installation; encoding them here would couple this bundle to sibling
-     * bundles' routing choices and drift the moment those choices change.
-     * Operator competence + the README security caveat carry the rest.
+     * deployment shares. Other firewall-protected prefixes vary by
+     * installation (e.g. JWT-protected REST APIs, WebDAV mounts, custom
+     * host firewalls); encoding them here would couple this bundle to
+     * sibling bundles' routing choices and drift the moment those
+     * choices change. Operator review of `path:` against the host's
+     * security.yaml carries the rest.
      */
     private const SUB_REQUEST_DENIED_PATH_PREFIXES = [
         '/admin',
