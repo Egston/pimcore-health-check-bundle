@@ -35,6 +35,7 @@ class GraphQlSubRequestCheck implements HealthCheckInterface
         private readonly string $name,
         private readonly string $path,
         private readonly string $query,
+        private readonly float $timeout,
         private readonly array $assertions,
         private readonly ?string $apiKey = null,
     ) {
@@ -58,11 +59,7 @@ class GraphQlSubRequestCheck implements HealthCheckInterface
                 json_encode(['query' => $this->query], JSON_THROW_ON_ERROR)
             );
 
-            $response = $this->kernel->handle(
-                $request,
-                HttpKernelInterface::SUB_REQUEST,
-                false
-            );
+            $response = $this->dispatchWithTimeout($request);
         } catch (\JsonException $exception) {
             $this->logger->error(
                 'GraphQL sub-request health check could not encode request body.',
@@ -161,6 +158,43 @@ class GraphQlSubRequestCheck implements HealthCheckInterface
         $separator = str_contains($this->path, '?') ? '&' : '?';
 
         return $this->path . $separator . 'apikey=' . rawurlencode($this->apiKey);
+    }
+
+    /**
+     * Bound the kernel sub-request via pcntl_alarm so a pathological resolver
+     * doesn't keep an FPM worker pinned past the kubelet's timeoutSeconds:
+     * kubelet kills the cgi-fcgi process but the FPM worker handling that
+     * exec keeps running until the resolver returns. Without a PHP-side cap,
+     * overlapping probe attempts can saturate the worker pool.
+     *
+     * Sub-second precision is rounded up to the nearest whole second since
+     * pcntl_alarm() is integer-only. If pcntl is not loaded we fall back to
+     * the kubelet's bound — better to run unbounded than to abort the probe.
+     */
+    private function dispatchWithTimeout(Request $request): mixed
+    {
+        if (!extension_loaded('pcntl')) {
+            return $this->kernel->handle($request, HttpKernelInterface::SUB_REQUEST, false);
+        }
+
+        $timeout = $this->timeout;
+        $previousAsync = pcntl_async_signals(true);
+
+        try {
+            // Install handler and arm the alarm INSIDE the try so a SIGALRM
+            // delivered between scheduling and the kernel-handle call still
+            // runs through the finally that restores async-signal state.
+            pcntl_signal(SIGALRM, static function () use ($timeout): void {
+                throw new \RuntimeException(sprintf('GraphQL sub-request exceeded timeout of %.1fs.', $timeout));
+            });
+            pcntl_alarm((int) max(1, ceil($timeout)));
+
+            return $this->kernel->handle($request, HttpKernelInterface::SUB_REQUEST, false);
+        } finally {
+            pcntl_alarm(0);
+            pcntl_signal(SIGALRM, SIG_DFL);
+            pcntl_async_signals($previousAsync);
+        }
     }
 
     /**
