@@ -101,7 +101,7 @@ class GraphQlSubRequestCheck implements HealthCheckInterface
                 'GraphQL sub-request health check returned non-200 status.',
                 $this->context([
                     'status_code' => $statusCode,
-                    'body_excerpt' => mb_substr((string) $response->getContent(), 0, 512),
+                    'body_excerpt' => $this->redactPotentialSecrets(mb_substr((string) $response->getContent(), 0, 512)),
                 ])
             );
 
@@ -174,5 +174,43 @@ class GraphQlSubRequestCheck implements HealthCheckInterface
             'path' => $this->path,
             'api_key_provided' => $this->apiKey !== null,
         ], $extra);
+    }
+
+    /**
+     * The body excerpt is operator-controlled (whatever resolver the configured
+     * `path` reaches) and lands in error-level context that may forward to
+     * Stackdriver / Cloud Monitoring. Strip common secret shapes before they
+     * leave the process. Conservative redaction — false positives are
+     * acceptable here, false negatives are not.
+     */
+    private function redactPotentialSecrets(string $excerpt): string
+    {
+        // Value class includes base64 special chars (+ / =) and the colon used in
+        // some token formats — real Bearer tokens and API keys regularly contain
+        // these, and stopping at the first one would leak the rest of the secret.
+        $patterns = [
+            '/(Bearer|Basic|Negotiate|Digest)\s+[A-Za-z0-9._\-+\/=:]+/i' => '$1 [REDACTED]',
+            '/eyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+/' => '[REDACTED-JWT]',
+            '/"?(api[_-]?key|password|secret|token|authorization)"?\s*[=:]\s*"?[A-Za-z0-9._\-+\/=:]+"?/i' => '$1=[REDACTED]',
+            '/(\w+:\/\/[^:\/\s]+):([^@\/\s]+)@/' => '$1:[REDACTED]@',
+        ];
+
+        foreach ($patterns as $pattern => $replacement) {
+            $result = preg_replace($pattern, $replacement, $excerpt);
+            if ($result === null) {
+                // PCRE compile error, JIT exhaustion, or backtrack-limit hit on
+                // adversarial input. Fail closed — the function exists to prevent
+                // exactly this leak.
+                $this->logger->warning(
+                    'GraphQL sub-request log redactor regex failed; replacing excerpt with sentinel.',
+                    $this->context(['pcre_error' => preg_last_error_msg()])
+                );
+
+                return '[REDACTED — regex failure]';
+            }
+            $excerpt = $result;
+        }
+
+        return $excerpt;
     }
 }
