@@ -153,6 +153,7 @@ class EgstonPimcoreHealthCheckExtension extends ConfigurableExtension implements
                 ->setArgument('$timeout', (float) $endpointConfig['timeout'])
                 ->setArgument('$assertions', $endpointConfig['assert'] ?? [])
                 ->setArgument('$apiKey', $endpointConfig['api_key'] ?? null)
+                ->setArgument('$operationName', $endpointConfig['operation_name'] ?? null)
                 ->addTag('egston.pimcore_health_check.check');
 
             $container->setDefinition($serviceId, $definition);

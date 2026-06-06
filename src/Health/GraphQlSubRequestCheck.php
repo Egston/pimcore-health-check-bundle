@@ -38,6 +38,7 @@ class GraphQlSubRequestCheck implements HealthCheckInterface
         private readonly float $timeout,
         private readonly array $assertions,
         private readonly ?string $apiKey = null,
+        private readonly ?string $operationName = null,
     ) {
     }
 
@@ -56,7 +57,7 @@ class GraphQlSubRequestCheck implements HealthCheckInterface
                 [],
                 [],
                 ['CONTENT_TYPE' => 'application/json'],
-                json_encode(['query' => $this->query], JSON_THROW_ON_ERROR)
+                json_encode($this->buildBody(), JSON_THROW_ON_ERROR)
             );
 
             $response = $this->dispatchWithTimeout($request);
@@ -147,6 +148,24 @@ class GraphQlSubRequestCheck implements HealthCheckInterface
 
             throw $exception;
         }
+    }
+
+    /**
+     * Include operationName only when configured: request-validation layers in
+     * front of GraphQL endpoints (default-deny per-operation rules) key on the
+     * body's operationName member and reject requests that omit it, so a probe
+     * targeting such an endpoint must declare which operation it runs.
+     *
+     * @return array<string, string>
+     */
+    private function buildBody(): array
+    {
+        $body = ['query' => $this->query];
+        if ($this->operationName !== null) {
+            $body['operationName'] = $this->operationName;
+        }
+
+        return $body;
     }
 
     private function buildUri(): string
